@@ -58,23 +58,44 @@ class Network(object):
         training_data = list(training_data)
         n = len(training_data)
 
+        #The sum of all values in the numpy nabla_w arrays for each epoch
+        nabla_w_sum_epoch = []
+        #The sum "" 
+        delta_nabla_w_sum_epoch = []
+        train_accuracy = []
+
         if test_data:
             test_data = list(test_data)
             n_test = len(test_data)
+            if n_test == 0:
+                raise Exception("Test data may not be empty if provided")
 
         for j in range(epochs):
+
+            ## Use a numpy array to create a mutable object (an object passed by reference we can modify)
+            # due to passing by object reference we are able to modify the variable from within the callee 
+            nabla_w_sum = np.zeros(1)
+            delta_nabla_w_sum = np.zeros(1)
+
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                self.update_mini_batch(mini_batch, eta, nabla_w_sum,delta_nabla_w_sum)
             if test_data:
-                print("Epoch {} : {} / {}".format(j,self.evaluate(test_data),n_test));
+                correctGuesses = self.evaluate(test_data)
+                print("Epoch {} : {} / {}".format(j,correctGuesses,n_test))
+                train_accuracy.append(correctGuesses/n_test)
             else:
                 print("Epoch {} complete".format(j))
+            
+            nabla_w_sum_epoch.append(nabla_w_sum[0])
+            delta_nabla_w_sum_epoch.append(delta_nabla_w_sum[0])
 
-    def update_mini_batch(self, mini_batch, eta):
+        return (nabla_w_sum_epoch,train_accuracy, delta_nabla_w_sum_epoch)
+
+    def update_mini_batch(self, mini_batch, eta, nabla_w_sum,delta_nabla_w_sum):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -83,12 +104,24 @@ class Network(object):
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         for x, y in mini_batch:
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
+
+            sumOfDeltaNabla = [np.sum(x) for x in delta_nabla_b]
+
+            #Keep track of the delta
+            delta_nabla_w_sum[0] = delta_nabla_w_sum[0] + sum(sumOfDeltaNabla)
+
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
         self.weights = [w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
+        #Remember errors
+
+        ## nabla_w is a list of lists of numpy arrays. sum up the value
+        sum_of_arrays = [np.sum(x) for x in nabla_w]
+        # add to the previously passed value. The function could also return the value ins
+        nabla_w_sum[0] =nabla_w_sum[0] + sum(sum_of_arrays)
 
     def backprop(self, x, y):
         """Return a tuple ``(nabla_b, nabla_w)`` representing the
